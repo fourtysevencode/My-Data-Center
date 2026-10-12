@@ -70,6 +70,9 @@ No SSH key or password is needed; the game has its own login. Use a terminal at 
 
 ### Troubleshooting
 
+- **`Permission denied (publickey)`**: the SSH config entry from step 2 is missing or misspelled,
+  so you reached the host machine instead of the game. Add it, then run
+  `ssh-keygen -R play.ronakbuilds.tech` to forget the wrong host key and connect again.
 - **`remote error: tls: internal error`**: your computer has an old DNS record cached. On macOS,
   run `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder` and try again.
 - **`cloudflared: command not found`**: cloudflared isn't installed or isn't on your `PATH`.

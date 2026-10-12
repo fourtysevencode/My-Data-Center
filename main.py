@@ -1,5 +1,4 @@
 import curses
-import hashlib
 import time
 import threading
 import database
@@ -44,32 +43,12 @@ def user_exists(username):
         return row
 
 
-def password_digest(password):
-    return hashlib.sha256(password.encode("utf-8")).hexdigest()
-
-
 def authenticate(username, password):
-    """Return whether the supplied password matches an existing account."""
-    with database.connect() as conn:
-        row = conn.execute(
-            "SELECT password FROM player WHERE username = ?", (username,)
-        ).fetchone()
-
-    if not row:
-        return False
-
-    stored_password = row[0]
-    digest = password_digest(password)
-    # Accept an older plaintext value once, while new accounts use hashes.
-    return stored_password in (digest, password)
+    return database.authenticate(username, password)
 
 
 def create_account(username, password):
-    with database.connect() as conn:
-        conn.execute(
-            "INSERT INTO player (username, password) VALUES (?, ?)",
-            (username, password_digest(password)),
-        )
+    database.create_player(username, password)
 
 
 def load_game_state(username):

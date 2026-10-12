@@ -1,11 +1,17 @@
-import sqlite3
+import hashlib
+import hmac
 import json
+import sqlite3
 
 DB = "data.db"
 
 
 def connect():
     return sqlite3.connect(DB)
+
+
+def password_digest(password):
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 
 def setup():
@@ -39,8 +45,20 @@ def create_player(username, password):
     with connect() as conn:
         conn.execute(
             "INSERT OR IGNORE INTO player (username, password) VALUES (?, ?)",
-            (username, password)
+            (username, password_digest(password))
         )
+
+
+def authenticate(username, password):
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT password FROM player WHERE username = ?", (username,)
+        ).fetchone()
+
+    if row is None:
+        return False
+
+    return hmac.compare_digest(row[0], password_digest(password))
 
 
 def load_player(username):
@@ -82,5 +100,3 @@ def save_player(username, balance, name, infrastructure):
 
 if __name__ == "__main__":
     setup()
-    create_player("ronak", "example-password")
-    print(load_player("ronak"))

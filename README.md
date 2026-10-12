@@ -9,6 +9,8 @@ the income roll in as you grow from a budget VPS to an orbital cloud.
 ssh play.ronakbuilds.tech
 ```
 
+**Website:** https://ronakbuilds.tech/My-Data-Center/ (setup guide with copy-paste commands)
+
 ## How to play
 
 1. Connect (see [Connecting](#connecting) below).

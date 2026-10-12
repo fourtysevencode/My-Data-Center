@@ -1,6 +1,8 @@
 import curses
+import hashlib
 import time
 import threading
+import database
 
 ascii_heading = """
                                 welcome to
@@ -26,7 +28,78 @@ SERVERS = {
 balance = 500
 owned = {key: 0 for key in SERVERS}
 name = ""
+active_username = None
 balance_lock = threading.RLock()
+
+
+database.setup()
+
+
+def user_exists(username):
+    with database.connect() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM player where username = ?", (username,)
+        ).fetchone()
+
+        return row
+
+
+def password_digest(password):
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+
+def authenticate(username, password):
+    """Return whether the supplied password matches an existing account."""
+    with database.connect() as conn:
+        row = conn.execute(
+            "SELECT password FROM player WHERE username = ?", (username,)
+        ).fetchone()
+
+    if not row:
+        return False
+
+    stored_password = row[0]
+    digest = password_digest(password)
+    # Accept an older plaintext value once, while new accounts use hashes.
+    return stored_password in (digest, password)
+
+
+def create_account(username, password):
+    with database.connect() as conn:
+        conn.execute(
+            "INSERT INTO player (username, password) VALUES (?, ?)",
+            (username, password_digest(password)),
+        )
+
+
+def load_game_state(username):
+    global balance, owned, name, active_username
+
+    player = database.load_player(username)
+    if player is None:
+        raise ValueError(f"Cannot load missing player {username!r}.")
+
+    with balance_lock:
+        balance = player["balance"]
+        name = player["name"]
+        owned = {
+            key: int(player["infrastructure"].get(key, 0))
+            for key in SERVERS
+        }
+        active_username = username
+
+
+def save_game_state():
+    with balance_lock:
+        username = active_username
+        current_balance = balance
+        current_name = name
+        current_owned = owned.copy()
+
+    if username is not None:
+        database.save_player(
+            username, current_balance, current_name, current_owned
+        )
 
 
 def calculate_income():
@@ -45,6 +118,7 @@ def income_loop():
         income = calculate_income()
         with balance_lock:
             balance += income
+        save_game_state()
 
 
 income_thread = threading.Thread(target=income_loop, daemon=True)
@@ -77,16 +151,60 @@ def main(stdscr):
     stdscr.timeout(100)
 
     message = "Welcome to your Data Center!"
-    mode = "menu"
+    mode = "login_username"
     selected = ""
     input_buffer = ""
+    login_username = ""
 
     while True:
         # Process keyboard input without blocking.
         key = stdscr.getch()
 
         if key != -1:
-            if mode == "menu":
+            if mode == "login_username":
+                if key in (10, 13, curses.KEY_ENTER):
+                    login_username = input_buffer.strip()
+                    if login_username:
+                        if user_exists(login_username):
+                            mode = "login_password"
+                            message = "Account found. Enter your password."
+                        else:
+                            mode = "signup_password"
+                            message = "Account not found. Set a password."
+                        input_buffer = ""
+                    else:
+                        message = "Enter a username."
+                elif key in (curses.KEY_BACKSPACE, 127, 8):
+                    input_buffer = input_buffer[:-1]
+                elif 32 <= key <= 126:
+                    input_buffer += chr(key)
+
+            elif mode in ("login_password", "signup_password"):
+                if key in (10, 13, curses.KEY_ENTER):
+                    password = input_buffer
+                    if not password:
+                        message = "Enter a password."
+                    elif mode == "login_password":
+                        if authenticate(login_username, password):
+                            load_game_state(login_username)
+                            message = f"Welcome back, {login_username}!"
+                            mode = "menu"
+                        else:
+                            message = "Incorrect password. Try again."
+                            input_buffer = ""
+                    else:
+                        create_account(login_username, password)
+                        load_game_state(login_username)
+                        message = f"Account created for {login_username}."
+                        mode = "menu"
+                    if mode == "menu":
+                        input_buffer = ""
+                elif key in (curses.KEY_BACKSPACE, 127, 8):
+                    input_buffer = input_buffer[:-1]
+                elif 32 <= key <= 126:
+                    input_buffer += chr(key)
+
+            elif mode == "menu":
                 if key in (ord("1"), ord("2"), ord("3"), ord("4")):
                     choice = chr(key)
 
@@ -106,6 +224,7 @@ def main(stdscr):
                     if mode == "name":
                         if input_buffer.strip():
                             name = input_buffer.strip()
+                            save_game_state()
                             message = f"Data center renamed to {name}."
                         mode = "menu"
 
@@ -124,6 +243,7 @@ def main(stdscr):
                                 if balance >= cost:
                                     balance -= cost
                                     owned[selected] += 1
+                                    save_game_state()
                                     message = (
                                         f"Purchased {server['name']} "
                                         f"for ${cost:,}!"
@@ -169,7 +289,24 @@ def main(stdscr):
         write(5, 2, f"Income: ${calculate_income():,}/sec")
         write(6, 2, f"Servers owned: {sum(owned.values())}")
 
-        if mode == "menu":
+        if mode == "login_username":
+            write(8, 2, "Log in to your Data Center")
+            write(9, 2, "Username:")
+            write(10, 2, input_buffer + "_")
+            write(12, 2, "Press Enter to continue.")
+
+        elif mode in ("login_password", "signup_password"):
+            write(8, 2, "Log in to your Data Center")
+            prompt = (
+                "Password:"
+                if mode == "login_password"
+                else "Set a password:"
+            )
+            write(9, 2, prompt)
+            write(10, 2, "*" * len(input_buffer) + "_")
+            write(12, 2, "Press Enter to continue.")
+
+        elif mode == "menu":
             write(8, 2, "1. Name your data center")
             write(9, 2, "2. Buy servers")
             write(10, 2, "3. View infrastructure")
@@ -212,7 +349,15 @@ def main(stdscr):
 
         # Keep status messages away from active input fields on short terminals.
         message_y = height - 2
-        input_rows = {9} if mode == "name" else {17} if mode == "buy" else set()
+        input_rows = (
+            {10}
+            if mode in ("login_username", "login_password", "signup_password")
+            else {9}
+            if mode == "name"
+            else {17}
+            if mode == "buy"
+            else set()
+        )
         while message_y in input_rows and message_y > 0:
             message_y -= 1
         write(message_y, 2, message)
@@ -221,6 +366,8 @@ def main(stdscr):
         # Earn money once per second, independently of keyboard input.
         # The UI refreshes every 100 ms.
         time.sleep(0.01)
+
+    save_game_state()
 
 
 try:

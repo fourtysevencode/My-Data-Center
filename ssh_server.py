@@ -17,6 +17,17 @@ HOST = os.environ.get("GAME_HOST", "0.0.0.0")
 PORT = 2222
 HOST_KEY_FILE = "host_key"
 GAME_SCRIPT = os.path.abspath("game.py")
+TERMINFO_DIRS = ["/etc/terminfo", "/lib/terminfo", "/usr/share/terminfo"]
+
+
+def has_terminfo(term):
+    if not term or "/" in term:
+        return False
+    return any(
+        os.path.exists(os.path.join(d, sub, term))
+        for d in TERMINFO_DIRS
+        for sub in (term[0], format(ord(term[0]), "x"))
+    )
 
 
 class GameServer(paramiko.ServerInterface):
@@ -50,7 +61,10 @@ class GameServer(paramiko.ServerInterface):
         self, channel, term, width, height,
         pixelwidth, pixelheight, modes
     ):
-        self.term = term.decode() if isinstance(term, bytes) else term
+        term = term.decode() if isinstance(term, bytes) else term
+        # Clients like kitty/ghostty send TERM names this host has no terminfo
+        # for, which crashes curses; fall back to a common one.
+        self.term = term if has_terminfo(term) else "xterm-256color"
         self.width = max(1, width)
         self.height = max(1, height)
         return True

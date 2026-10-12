@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Data Center</title>
+<meta name="description" content="Your data center tycoon, playable in the terminal. ssh play.ronakbuilds.tech">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23000'/><rect x='3' y='3' width='10' height='3' fill='%23eef0f7'/><rect x='3' y='7' width='10' height='3' fill='%23eef0f7'/><rect x='3' y='11' width='10' height='2' fill='%23eef0f7'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000;
+    --panel: #0d1017;
+    --panel-line: #1b2030;
+    --ink: #eef0f7;
+    --muted: #8a90a2;
+    --accent: #eef0f7;
+    --ok: #7ee2a8;
+    --mono: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.6 var(--mono);
+  }
+  a { color: var(--ink); text-underline-offset: 3px; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+
+  /* Hero */
+  .hero { padding: 64px 0 40px; text-align: center; }
+  .banner {
+    background: var(--panel);
+    padding: clamp(10px, 3vw, 28px) clamp(8px, 2vw, 24px);
+    overflow: hidden;
+  }
+  .art {
+    margin: 0 auto;
+    display: inline-block;
+    text-align: left;
+    white-space: pre;
+    line-height: 1;
+    /* 80-column art: scale to the viewport so it never scrolls sideways. */
+    font-size: min(1.7vw, 14px);
+    letter-spacing: 0;
+    color: var(--ink);
+  }
+  .art .shade { color: #9aa0b3; }
+  .tagline {
+    margin: 18px 0 0;
+    font-size: clamp(14px, 2.2vw, 22px);
+    letter-spacing: 0.04em;
+  }
+
+  /* SSH call-out */
+  .connect {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 40px;
+    align-items: center;
+    padding: 48px 0 24px;
+  }
+  .label {
+    background: var(--panel);
+    padding: 14px 18px;
+  }
+  .label pre {
+    margin: 0;
+    font-size: clamp(5px, 0.9vw, 10px);
+    line-height: 1;
+    color: #d6d9e3;
+  }
+  .cmd-big { text-align: center; }
+  .cmd-big code {
+    display: block;
+    font-weight: 700;
+    font-size: clamp(18px, 3.4vw, 40px);
+    overflow-wrap: anywhere;
+  }
+  .req {
+    display: inline-block;
+    margin-top: 10px;
+    color: var(--ink);
+    font-size: clamp(13px, 1.8vw, 18px);
+    transform: rotate(-3deg);
+    letter-spacing: 0.04em;
+  }
+
+  /* Command box */
+  .term {
+    position: relative;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    padding: 16px 92px 16px 18px;
+    margin: 12px 0 0;
+    overflow-x: auto;
+  }
+  .term pre { margin: 0; white-space: pre; font-size: 15px; }
+  .term .p { color: var(--muted); user-select: none; }
+  .copy {
+    position: absolute;
+    top: 10px; right: 10px;
+    font: 700 12px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--bg);
+    background: var(--ink);
+    border: 0;
+    padding: 7px 10px;
+    cursor: pointer;
+  }
+  .copy:hover { background: #fff; }
+  .copy.done { background: var(--ok); }
+  .copy:focus-visible, .tab:focus-visible { outline: 2px solid var(--ok); outline-offset: 2px; }
+
+  /* Sections */
+  section { padding: 40px 0; border-top: 1px dashed var(--panel-line); }
+  h2 {
+    margin: 0 0 6px;
+    font-size: 15px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h2::before { content: "▓▒░ "; color: var(--ink); letter-spacing: 0; }
+  .lede { margin: 0 0 20px; color: var(--muted); }
+  ol.steps { list-style: none; padding: 0; margin: 0; counter-reset: s; }
+  ol.steps > li { counter-increment: s; margin: 0 0 32px; }
+  ol.steps > li > h3 { margin: 0; font-size: 18px; }
+  ol.steps > li > h3::before { content: "[" counter(s) "] "; color: var(--muted); }
+  ol.steps p { margin: 6px 0 0; color: var(--muted); }
+
+  .tabs { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+  .tab {
+    font: 700 13px var(--mono);
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--panel-line);
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+  .tab[aria-selected="true"] { color: var(--bg); background: var(--ink); border-color: var(--ink); }
+  .tabpanel[hidden] { display: none; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--panel-line); }
+  th { color: var(--muted); font-weight: 400; text-transform: uppercase; letter-spacing: 0.1em; font-size: 12px; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .table-scroll { overflow-x: auto; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+  kbd {
+    font: 700 13px var(--mono);
+    background: var(--ink); color: var(--bg);
+    padding: 1px 6px;
+  }
+  dl { margin: 0; }
+  dt { font-weight: 700; margin-top: 16px; }
+  dt:first-child { margin-top: 0; }
+  dd { margin: 4px 0 0; color: var(--muted); }
+  dd code, p code, li code { color: var(--ink); }
+
+  footer { padding: 32px 0 56px; color: var(--muted); font-size: 13px; border-top: 1px dashed var(--panel-line); }
+
+  @media (max-width: 760px) {
+    .hero { padding-top: 32px; }
+    .connect { grid-template-columns: 1fr; gap: 20px; justify-items: center; }
+    .grid2 { grid-template-columns: 1fr; gap: 28px; }
+    .term { padding-right: 18px; padding-top: 48px; }
+  }
+</style>
+</head>
+<body>
+<main class="wrap">
+
+  <header class="hero">
+    <div class="banner"><pre class="art" id="art" aria-label="My Data Center"></pre></div>
+    <p class="tagline">your data center tycoon playable in the terminal!</p>
+  </header>
+
+  <div class="connect">
+    <div class="label" aria-hidden="true"><pre id="ssh-label"></pre></div>
+    <div class="cmd-big">
+      <code>play.ronakbuilds.tech</code>
+      <span class="req">(requires cloudflared)</span>
+    </div>
+  </div>
+
+  <div class="term">
+    <pre><span class="p">$ </span><span data-copy>ssh play.ronakbuilds.tech</span></pre>
+    <button class="copy" type="button">Copy</button>
+  </div>
+
+  <section id="setup">
+    <h2>One-time setup</h2>
+    <p class="lede">The game is served through a Cloudflare Tunnel. Do this once and you can connect any time.</p>
+
+    <ol class="steps">
+      <li>
+        <h3>Install cloudflared</h3>
+        <div class="tabs" role="tablist" aria-label="Operating system">
+          <button class="tab" role="tab" aria-selected="true" aria-controls="os-mac" id="tab-mac">macOS</button>
+          <button class="tab" role="tab" aria-selected="false" aria-controls="os-win" id="tab-win" tabindex="-1">Windows</button>
+          <button class="tab" role="tab" aria-selected="false" aria-controls="os-linux" id="tab-linux" tabindex="-1">Linux</button>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="os-mac" aria-labelledby="tab-mac">
+          <div class="term"><pre><span class="p">$ </span><span data-copy>brew install cloudflared</span></pre><button class="copy" type="button">Copy</button></div>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="os-win" aria-labelledby="tab-win" hidden>
+          <div class="term"><pre><span class="p">&gt; </span><span data-copy>winget install --id Cloudflare.cloudflared</span></pre><button class="copy" type="button">Copy</button></div>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="os-linux" aria-labelledby="tab-linux" hidden>
+          <div class="term"><pre><span class="p">$ </span><span data-copy>curl -L -o cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 &amp;&amp; chmod +x cloudflared &amp;&amp; sudo mv cloudflared /usr/local/bin/</span></pre><button class="copy" type="button">Copy</button></div>
+          <p>Or grab a package for your distro from <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/">Cloudflare's downloads page</a>.</p>
+        </div>
+      </li>
+
+      <li>
+        <h3>Add this to your SSH config</h3>
+        <p>The file is <code>~/.ssh/config</code> (on Windows, <code>C:\Users\&lt;you&gt;\.ssh\config</code>). Create it if it doesn't exist.</p>
+        <div class="term"><pre data-copy>Host play.ronakbuilds.tech
+  ProxyCommand cloudflared access ssh --hostname %h</pre><button class="copy" type="button">Copy</button></div>
+        <p>On macOS or Linux you can append it in one go:</p>
+        <div class="term"><pre><span class="p">$ </span><span data-copy>printf 'Host play.ronakbuilds.tech\n  ProxyCommand cloudflared access ssh --hostname %%h\n' &gt;&gt; ~/.ssh/config</span></pre><button class="copy" type="button">Copy</button></div>
+      </li>
+
+      <li>
+        <h3>Connect</h3>
+        <div class="term"><pre><span class="p">$ </span><span data-copy>ssh play.ronakbuilds.tech</span></pre><button class="copy" type="button">Copy</button></div>
+        <p>No SSH key or password needed. The game has its own login. Pick a username and you're in.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section id="play">
+    <h2>How to play</h2>
+    <p class="lede">Start with $500. Buy servers. Watch the money roll in every second you're connected.</p>
+    <div class="grid2">
+      <div>
+        <dl>
+          <dt><kbd>1</kbd> Name your data center</dt>
+          <dd>Give it a name worth bragging about.</dd>
+          <dt><kbd>2</kbd> Buy servers</dt>
+          <dd>Type a server number and press Enter. Each extra copy of the same server costs 15% more.</dd>
+          <dt><kbd>3</kbd> View infrastructure</dt>
+          <dd>See what you own and what it earns. <kbd>M</kbd> goes back.</dd>
+          <dt><kbd>4</kbd> Exit</dt>
+          <dd>Progress saves automatically every second.</dd>
+        </dl>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>#</th><th>Server</th><th class="n">Cost</th><th class="n">Income</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Budget VPS</td><td class="n">$100</td><td class="n">$2/s</td></tr>
+            <tr><td>2</td><td>Compute Node</td><td class="n">$600</td><td class="n">$14/s</td></tr>
+            <tr><td>3</td><td>GPU Cluster</td><td class="n">$3,000</td><td class="n">$80/s</td></tr>
+            <tr><td>4</td><td>AI Datacenter</td><td class="n">$15,000</td><td class="n">$450/s</td></tr>
+            <tr><td>5</td><td>Quantum Farm</td><td class="n">$80,000</td><td class="n">$2,500/s</td></tr>
+            <tr><td>6</td><td>Orbital Cloud</td><td class="n">$400,000</td><td class="n">$15,000/s</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="help">
+    <h2>Troubleshooting</h2>
+    <dl>
+      <dt>Permission denied (publickey)</dt>
+      <dd>The SSH config entry is missing or misspelled, so you reached the host machine instead of the game. Add it, run <code>ssh-keygen -R play.ronakbuilds.tech</code>, and connect again.</dd>
+      <dt>remote error: tls: internal error</dt>
+      <dd>Your computer has an old DNS record cached. On macOS run <code>sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder</code>.</dd>
+      <dt>cloudflared: command not found</dt>
+      <dd>cloudflared isn't installed or isn't on your <code>PATH</code>. Redo step 1.</dd>
+      <dt>Garbled screen</dt>
+      <dd>Make your terminal at least 80×24 and reconnect.</dd>
+    </dl>
+  </section>
+
+  <footer>
+    built by <a href="https://ronakbuilds.tech">ronak</a> · source on <a href="https://github.com/fourtysevencode/My-Data-Center">GitHub</a> · hosted on <a href="https://hackclub.app">Hack Club Nest</a>
+  </footer>
+</main>
+
+<script>
+  // Banner art, copied from game.py. █ = solid, ░ = shadow.
+  const ART = [
+"█   █ █   █    ████   ███  █████  ███      ███  █████ █   █ █████ █████ ████",
+"██ ██░ █ █ ░   █░░░█ █ ░░█  ░█░░░█ ░░█    █ ░░░ █░░░░░██  █░ ░█░░░█░░░░░█░░░█",
+"█░█ █░░ █ ░ ░  █░░░█░█████░  █░░░█████░   █░ ░░░████░░█░█ █░░ █░░░████░░████░░",
+"█░░░█░░ █░ ░   █░░ █░█░░░█░░ █░░ █░░░█░░  █░░   █░░░░ █░░██░░ █░░ █░░░░ █░░█░",
+"█░░ █░░ █░░    ████ ░█░░░█░░ █░░ █░░░█░░   ███  █████░█░░ █░░ █░░ █████░█░░░█░",
+" ░░  ░░  ░░     ░░░░ ░░░  ░░  ░░  ░░  ░░    ░░░  ░░░░░ ░░  ░░  ░░  ░░░░░ ░░  ░",
+"  ░   ░   ░      ░░░░  ░   ░   ░   ░   ░     ░░░  ░░░░░ ░   ░   ░   ░░░░░ ░   ░",
+  ];
+  const art = document.getElementById("art");
+  art.innerHTML = ART.map(line =>
+    line.replace(/[&<>]/g, "").replace(/░+/g, m => `<span class="shade">${m}</span>`)
+  ).join("\n");
+
+  // "SSH INTO" in a dithered block font.
+  const FONT = {
+    S: ["████", "█   ", "████", "   █", "████"],
+    H: ["█  █", "█  █", "████", "█  █", "█  █"],
+    I: ["███", " █ ", " █ ", " █ ", "███"],
+    N: ["█   █", "██  █", "█ █ █", "█  ██", "█   █"],
+    T: ["█████", "  █  ", "  █  ", "  █  ", "  █  "],
+    O: ["████", "█  █", "█  █", "█  █", "████"],
+    " ": ["  ", "  ", "  ", "  ", "  "],
+  };
+  const word = "SSH INTO";
+  const rows = [0, 1, 2, 3, 4].map(r =>
+    [...word].map(c => FONT[c][r]).join(" ").replace(/█/g, "▒▒")
+      .replace(/ /g, "  ")
+  );
+  document.getElementById("ssh-label").textContent = rows.join("\n");
+
+  // Copy buttons.
+  document.querySelectorAll(".copy").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const src = btn.parentElement.querySelector("[data-copy]");
+      try {
+        await navigator.clipboard.writeText(src.textContent);
+        btn.textContent = "Copied";
+        btn.classList.add("done");
+      } catch {
+        btn.textContent = "Select it";
+      }
+      setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1600);
+    });
+  });
+
+  // OS tabs.
+  const tabs = [...document.querySelectorAll(".tab")];
+  function select(tab) {
+    tabs.forEach(t => {
+      const on = t === tab;
+      t.setAttribute("aria-selected", on);
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+    });
+  }
+  tabs.forEach((t, i) => {
+    t.addEventListener("click", () => select(t));
+    t.addEventListener("keydown", e => {
+      const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+      if (d) { const n = tabs[(i + d + tabs.length) % tabs.length]; select(n); n.focus(); }
+    });
+  });
+  // Preselect the visitor's OS.
+  const ua = navigator.userAgent;
+  if (/Windows/.test(ua)) select(document.getElementById("tab-win"));
+  else if (/Linux|X11/.test(ua) && !/Android/.test(ua)) select(document.getElementById("tab-linux"));
+</script>
+</body>
+</html>

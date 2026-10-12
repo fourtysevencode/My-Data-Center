@@ -13,7 +13,7 @@ import threading
 
 import paramiko
 
-HOST = "localhost"
+HOST = os.environ.get("GAME_HOST", "0.0.0.0")
 PORT = 2222
 HOST_KEY_FILE = "host_key"
 GAME_SCRIPT = os.path.abspath("game.py")

@@ -27,10 +27,18 @@ class GameServer(paramiko.ServerInterface):
         self.term = "xterm-256color"
 
     def get_allowed_auths(self, username):
-        return "none"
+        return "none,password,publickey"
 
     def check_auth_none(self, username):
         # The game handles its own account registration and login.
+        return paramiko.AUTH_SUCCESSFUL
+
+    # Some clients (e.g. Cloudflare's browser SSH) insist on a password or key;
+    # accept anything since the game does its own login.
+    def check_auth_password(self, username, password):
+        return paramiko.AUTH_SUCCESSFUL
+
+    def check_auth_publickey(self, username, key):
         return paramiko.AUTH_SUCCESSFUL
 
     def check_channel_request(self, kind, chanid):

@@ -115,6 +115,7 @@ You can also play without SSH by running `python3 game.py` directly.
 
 The live server runs on [Hack Club Nest](https://hackclub.app) (`fourtysevencode@hackclub.app`):
 
+- You will need to host on your own server / machine
 - `ssh_server.py` runs from `~/My-Data-Center` with the project's `.venv`.
 - A Cloudflare Tunnel named `play-game` routes `play.ronakbuilds.tech` to `ssh://localhost:2222`.
   Its config is in `~/.cloudflared/config.yml`.
@@ -125,7 +126,6 @@ The live server runs on [Hack Club Nest](https://hackclub.app) (`fourtysevencode
 To deploy an update:
 
 ```bash
-ssh fourtysevencode@hackclub.app
 cd ~/My-Data-Center && git pull
 pkill -f ssh_server.py; ~/start-game.sh
 ```
